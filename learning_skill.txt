@@ -1,0 +1,272 @@
+================================================================
+LEARNING SKILL GUIDE — Spotify Mood Ring
+================================================================
+
+HOW TO USE THIS GUIDE
+----------------------------------------------------------------
+Work through sections in order. Each step tells you exactly one
+file to open and exactly what to do in it. Write and test code in
+the notebook first; once a function works correctly, cut it out
+of the notebook and paste it into the matching src/ file — that
+is what makes it reusable in later notebooks and testable.
+
+----------------------------------------------------------------
+⚠️ DATA FEASIBILITY NOTE — READ THIS BEFORE YOU START SCRAPING
+----------------------------------------------------------------
+The original idea of scraping "Spotify weekly charts" directly is
+NOT achievable with requests + BeautifulSoup. Spotify's charts
+pages (charts.spotify.com) are built with a JavaScript framework
+(React) that fetches data from a private, authenticated internal
+API after the page loads. BeautifulSoup only sees the raw HTML
+Spotify's server sends BEFORE JavaScript runs — for a page like
+this, that raw HTML is nearly empty (a `<div id="root"></div>`
+with no chart data inside it). This is called client-side
+rendering, and it's the single most common reason a scraping
+project quietly returns nothing. You cannot fix this by changing
+your BeautifulSoup selectors — the data genuinely is not in the
+HTML you're allowed to fetch with a simple GET request.
+
+THE FIX — same skills, an achievable target:
+Scrape Wikipedia's "Billboard Year-End Hot 100 singles" pages
+instead (e.g. https://en.wikipedia.org/wiki/Billboard_Year-End_Hot_100_singles_of_2023).
+These are plain, server-rendered HTML tables — no JavaScript
+needed, no login, no rate-limit tricks, and one page per year
+going back decades. You'll scrape one page per year instead of
+one page per week, which is actually a friendlier project for a
+first scraper: fewer requests, more stable structure.
+
+For "mood" data (valence, energy, tempo, danceability) you were
+always going to need audio features that aren't scrapable from
+any public webpage anyway — Spotify only exposes those through
+its authenticated API. Use a pre-downloaded Kaggle dataset of
+Spotify audio features instead (search Kaggle for "Spotify
+tracks dataset" or "Spotify audio features") — download the CSV
+once, place it in data/raw/, and join it to your scraped chart
+data by song title + artist name. This join will be imperfect
+(different spellings, "feat." formatting, etc.) — cleaning that
+up is itself a real, useful exercise, not a shortcut.
+
+----------------------------------------------------------------
+SECTION 1 — PYTHON FUNDAMENTALS (FUNCTIONS, CONTROL FLOW)
+----------------------------------------------------------------
+GOAL: Build small, single-purpose functions for fetching and
+parsing pages, before worrying about the full dataset.
+
+STEPS:
+1. Open notebooks/01_scrape_explore.ipynb.
+2. Fetch ONE Wikipedia year page with requests.get(url) and
+   print response.status_code — confirm it's 200 before doing
+   anything else.
+3. Write a function parse_year_page(html, year) that takes the
+   raw HTML and a year, and returns a list of dicts like
+   {"year": year, "rank": ..., "title": ..., "artist": ...}.
+   Use BeautifulSoup to find the correct <table> (Wikipedia
+   tables usually have class "wikitable") and loop over its
+   <tr> rows.
+4. Wrap the fetch in a function fetch_year(year) that builds the
+   URL from the year, adds a time.sleep(1) delay, and calls
+   requests.get(). Add a try/except so one failed year doesn't
+   crash the whole run — on failure, print a warning and return
+   None instead of raising.
+5. Test fetch_year(2023) and parse_year_page() together on one
+   year before looping over many.
+6. Once both functions work correctly on one year, cut them out
+   of the notebook and paste them into src/scraper.py.
+
+SELF-CHECK:
+[ ] parse_year_page() returns a list of dicts, not a DataFrame
+    (keep DataFrame construction in the notebook, not in this
+    function — it's more reusable this way)
+[ ] fetch_year() does not crash the notebook if a year is missing
+    or the request times out
+[ ] Both functions live in src/scraper.py and can be imported
+    with `from src.scraper import fetch_year, parse_year_page`
+
+DONE WHEN: you can call fetch_year(2023) and parse_year_page()
+from a fresh notebook cell after `import src.scraper` and get a
+correct list of ~100 songs back.
+
+----------------------------------------------------------------
+SECTION 2 — DATA EXTRACTION (WEB SCRAPING, MULTIPLE YEARS)
+----------------------------------------------------------------
+GOAL: Scrape a full range of years into raw, unprocessed files.
+
+STEPS:
+1. Still in notebooks/01_scrape_explore.ipynb, write a loop that
+   calls fetch_year() for every year in your chosen range (e.g.
+   2010–2023).
+2. After each year's HTML is parsed, save that year's raw parsed
+   list as its own file: data/raw/year_2010.json,
+   data/raw/year_2011.json, etc. — one file per year, saved
+   immediately after scraping it, not held in memory until the
+   end.
+3. Before scraping a year, check if data/raw/year_<year>.json
+   already exists — if it does, skip it. This makes your scraper
+   safely resumable if it's interrupted partway through.
+4. Add a print statement after each year finishes so you can see
+   progress (e.g. "2015: 100 songs scraped").
+
+SELF-CHECK:
+[ ] Running the loop twice in a row does NOT re-scrape years
+    that already have a saved file
+[ ] data/raw/ contains one JSON file per year after a full run
+[ ] Deliberately breaking your internet mid-run (or killing the
+    notebook) and re-running the loop picks up where it left off
+
+DONE WHEN: data/raw/ has one file per year in your chosen range,
+and you can explain out loud why saving per-year instead of one
+big file at the end matters (it protects your scraping progress
+if something crashes halfway through).
+
+----------------------------------------------------------------
+SECTION 3 — PANDAS DATAFRAME BASICS
+----------------------------------------------------------------
+GOAL: Combine your scraped years into one clean DataFrame and
+join it with the Kaggle audio-features dataset.
+
+STEPS:
+1. Open notebooks/02_clean_merge.ipynb.
+2. Download a Spotify audio-features CSV from Kaggle (search
+   "Spotify tracks dataset") and place it at
+   data/raw/spotify_audio_features.csv.
+3. Load every data/raw/year_*.json file and combine them into
+   one DataFrame with columns: year, rank, title, artist.
+4. Run df.info() and df.describe() — confirm the row count
+   roughly matches (number of years) × 100.
+5. Load the Kaggle CSV into a second DataFrame and inspect its
+   column names — find which columns hold song title and artist
+   name (names vary by dataset: "track_name", "artists", etc.).
+6. Normalize both DataFrames' title/artist columns the same way
+   before merging: lowercase, strip whitespace, remove
+   featuring-artist text like "(feat. X)". Write this as a
+   function normalize_text(s) in src/clean.py.
+7. Merge the two DataFrames on the normalized title+artist
+   columns with pd.merge(how='left'), and report what
+   percentage of chart songs successfully matched an audio-
+   features row.
+
+SELF-CHECK:
+[ ] normalize_text() lives in src/clean.py, not copy-pasted
+    inline in the notebook
+[ ] You printed the exact match rate (e.g. "68% of songs
+    matched") — not just eyeballed it
+[ ] You looked at 5 UNMATCHED songs and can explain why each one
+    failed to match (misspelling, missing from Kaggle dataset,
+    remix/version naming difference, etc.)
+
+DONE WHEN: data/processed/merged_chart_audio.csv exists, with a
+documented match rate and at least one real example of why a
+row failed to match.
+
+----------------------------------------------------------------
+SECTION 4 — FILTERING ROWS/COLUMNS, BOOLEAN INDEXING
+----------------------------------------------------------------
+GOAL: Answer concrete questions about the merged dataset using
+filters, not loops.
+
+STEPS:
+1. Open notebooks/03_filtering_questions.ipynb and load
+   data/processed/merged_chart_audio.csv.
+2. Answer each of these with a ONE-LINE boolean filter, printing
+   the result each time:
+   a. All songs that ranked in the top 10 in any year
+   b. All songs with a valence score below 0.3 (the "saddest"
+      songs that still charted)
+   c. All artists that appear in more than 3 different years'
+      charts (hint: use value_counts() on the artist column
+      first, then filter that result)
+   d. All songs from a single specific year AND with energy
+      above 0.8 — practice combining two conditions with `&`
+      and parentheses around each condition
+
+SELF-CHECK:
+[ ] Every answer is a single filter expression, not a for-loop
+[ ] Combined conditions use `&` (not `and`) with each condition
+    wrapped in parentheses
+[ ] You printed the actual resulting rows for each question, not
+    just a row count
+
+DONE WHEN: you can write any of the four filters above again
+from a blank cell without checking your earlier work.
+
+----------------------------------------------------------------
+SECTION 5 — RESHAPING AND PIVOTING DATAFRAMES
+----------------------------------------------------------------
+GOAL: Build a table showing mood by month/year to answer the
+project's core question.
+
+STEPS:
+1. Open notebooks/04_pivot_seasonal_mood.ipynb.
+2. Since your chart data is year-end (one snapshot per year,
+   not weekly), build a pivot table with rows = year, columns =
+   a genre or decade grouping (if your dataset has a genre
+   column; otherwise use rank-bucket: top 10 / 11-50 / 51-100),
+   values = mean valence, using pivot_table(aggfunc='mean').
+3. Build a second pivot: rows = decade (compute this from year
+   with (year // 10) * 10), columns = rank-bucket, values =
+   mean energy.
+4. Use melt() to turn one of your pivot tables back into long
+   format, and confirm the row count matches what you'd expect
+   (rows × columns of the pivot table).
+
+SELF-CHECK:
+[ ] Both pivot tables render without error and show sensible,
+    non-NaN values in most cells
+[ ] You can explain in one sentence what pivot_table(aggfunc=
+    'mean') is doing differently from a plain groupby().mean()
+
+DONE WHEN: you have two distinct pivot tables answering two
+different questions about mood across time/rank, plus one
+successful melt() round-trip.
+
+----------------------------------------------------------------
+SECTION 6 — NUMPY VECTORIZED OPERATIONS
+----------------------------------------------------------------
+GOAL: Use array math (not loops) to find trends and outliers.
+
+STEPS:
+1. Open notebooks/05_numpy_stats_plots.ipynb.
+2. Sort your merged DataFrame by year, then compute a rolling
+   3-year average of valence using df['valence'].rolling(3).mean()
+   — inspect the underlying NumPy array with .to_numpy() and
+   confirm you understand what the rolling window is doing.
+3. Compute z-scores for valence using array math directly:
+   z = (arr - arr.mean()) / arr.std() — do NOT use a loop.
+4. Use a boolean mask (np.abs(z) > 2) to pull out "outlier"
+   songs — (moods far outside the norm for their era).
+5. Build a correlation matrix across valence, energy, tempo, and
+   danceability using np.corrcoef(), and print it as a labeled
+   DataFrame for readability.
+6. Make one plot: rolling average valence over time (matplotlib
+   is fine — a simple line chart).
+
+SELF-CHECK:
+[ ] No manual for-loop appears anywhere in this notebook — every
+    calculation uses array/Series operations
+[ ] You can name the single strongest correlation from your
+    matrix and state it in plain English (e.g. "energy and
+    danceability move together the most")
+[ ] Your outlier list contains real song names you can look up
+    and sanity-check by ear
+
+DONE WHEN: you have one finished plot, one printed correlation
+matrix, and a short list of outlier songs you found via z-score,
+not by eyeballing the data.
+
+================================================================
+DEFINITION OF DONE FOR THE WHOLE PROJECT
+================================================================
+[ ] src/scraper.py contains fetch_year() and parse_year_page(),
+    both importable and tested independently of the notebooks
+[ ] data/raw/ contains one JSON file per scraped year plus the
+    downloaded Kaggle audio-features CSV
+[ ] data/processed/merged_chart_audio.csv exists with a
+    documented match rate against the Kaggle dataset
+[ ] All four Section 4 filtering questions answered with
+    one-line filters
+[ ] Two distinct pivot tables built, answering two different
+    mood-over-time questions
+[ ] One rolling-average plot, one correlation matrix, and one
+    z-score-based outlier list produced using array operations
+[ ] README's "Sample Finding" section filled in with a real
+    result, not a placeholder
