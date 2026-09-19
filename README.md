@@ -22,10 +22,10 @@ Built as a hands-on project to practice: Python fundamentals, NumPy vectorized o
 
 ## Findings
 
-1. **Valence trend by genre:** [British valence decrease from 0.25 in 2001 to 2022, while country stayed relatively flat across the same period.]
-2. **Widest mood swings:** [synth-pop had the widest year-to-year valence swings (std ≈ 0.333).]
-3. **Outliers:** [85 year-genre combinations were flagged as statistical outliers. The most extreme was indie in 2011 (valence 0.965) — a notably upbeat year compared to that genre's typical range.]
-4. **Correlations:** [Valence shows a moderate positive correlation with danceability (r=0.34) — happier songs tend to be more danceable — a weaker positive link with energy (r=0.21), and a moderate negative correlation with tempo (r=-0.31), suggesting faster songs trend slightly less positive.]
+1. **Valence trend by genre:** British valence decrease from 0.25 in 2001 to 2022, while country stayed relatively flat across the same period.
+2. **Widest mood swings:** synth-pop had the widest year-to-year valence swings (std ≈ 0.333).
+3. **Outliers:** 85 year-genre combinations were flagged as statistical outliers. The most extreme was indie in 2011 (valence 0.965) — a notably upbeat year compared to that genre's typical range.
+4. **Correlations:** Valence shows a moderate positive correlation with danceability (r=0.34) — happier songs tend to be more danceable — a weaker positive link with energy (r=0.21), and a moderate negative correlation with tempo (r=-0.31), suggesting faster songs trend slightly less positive.
 
 ---
 
