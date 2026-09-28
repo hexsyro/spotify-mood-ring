@@ -67,7 +67,7 @@ spotify-mood-ring/
 ## 🛠️ Setup
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/hexsyro/spotify-mood-ring
 cd spotify-mood-ring
 python -m venv venv
 source venv/bin/activate       # Windows: venv\Scripts\activate
